@@ -1,0 +1,22 @@
+CACHE MANIFEST
+# Ver 1.0
+
+# Add the entire internet to the "white list" of sites that may be accessed by this site.
+# This is needed for TypeKit and Google Analytics
+NETWORK:
+*
+
+# The following files are explicitly cached -
+CACHE:
+SMHAC.html
+led-green.png
+led-grey.png
+led-red.png
+js/jquery-1.11.1.min.js
+js/jquery.mobile-1.4.4.min.js
+js/pubnub-3.7.1.min.js
+js/moment.min.js
+js/jquery.mobile-1.4.4.min.map
+css/jquery.mobile-1.4.4.min.css
+css/bootstrap.min.css
+css/images/ajax-loader.gif

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html manifest="SMHAC.appcache">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content = "user-scalable=no, width=400">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="stylesheet" href="css/jquery.mobile-1.4.4.min.css">
+<script src="js/jquery-1.11.1.min.js"></script>
+<script src="js/jquery.mobile-1.4.4.min.js"></script>
+
+<script src="js/pubnub-3.7.1.min.js"></script>
+
+
+<style type="text/css">
+  .led {position: relative; top:100px;}
+  .interruttore {position: relative; top: 10px; width: 30%; margin: 0 auto;}
+</style>
+
+
+<script>
+
+var SMHAC_ID = "YOUR CLIENT ID - can be anything you want";
+var SMHA_ID = "YOUR SMHA raspberry ID - can be anything you want";
+var SUB_KEY    = 'YOUR PUBNUB SUBSCRIBER KEY';
+var PUB_KEY    = 'YOUR PUBNUB PUBLISHING KEY';
+var CIPHER_KEY = 'YOUR SECURITY ENCRYPTION KEY'; // generate it with openssl enc -aes-256-cbc -k secret -P -md sha1
+var CHANNEL    = 'YOUR OWN PUBNUB CHANNEL'
+
+
+var status_remote_caldaia;
+var PN;
+
+function initLocalCaldaia(status) {
+  switchLocalCaldaia(status);
+  setFlip('enable');
+}
+
+function setFlip(status) {
+  // status = enable || disable
+  $("#flip").flipswitch(status);
+}
+
+
+function parsePNMessage(message) {
+  mex = JSON.stringify(message);
+  src_id = message['src_id'];
+  cmd = message['cmd'];
+  result = message['result'];
+
+  if (src_id == SMHA_ID) {
+    console.log("receiving a message addressed to me: %s", mex)
+    if (cmd == 'status') {
+      status_remote_caldaia = (result == "0") ? "OFF" : "ON";
+      console.log("received a status answer : %s", status_remote_caldaia)
+      initLocalCaldaia(status_remote_caldaia);
+    }
+
+  }
+  else {
+    console.log("receiving a broadcast message")
+
+  }
+}
+
+function getRemoteCaldaia() {
+  console.log("getting status of remote caldaia");
+  // send message to SMHA via pubnub to get status
+  mex = '{"src_id": "' +  SMHAC_ID + '", "cmd": "status", "result": "--", "reply_to": "--", "_id": "123456", "dst_pin": "15"}';
+  jmex = JSON.parse(mex);
+  PN.publish({channel: CHANNEL, message: jmex});
+  console.log("pubnub status message sent!!");
+}
+
+
+function connect_cb() {
+  //called if we succesfully connect to pubnub
+  console.log("Connected to PubNub");
+  getRemoteCaldaia();
+
+}
+
+function initPubNub() {
+  pubnub = PUBNUB.init({                                  
+                        publish_key   : PUB_KEY,
+                        subscribe_key : SUB_KEY,
+                        cipher_key    : CIPHER_KEY,
+                        ssl: true
+                      });
+
+  pubnub.subscribe({                                      
+                    channel : CHANNEL,
+                    message : parsePNMessage, 
+                    connect: connect_cb
+     });
+
+  return pubnub;
+}
+
+function switchLed(status) {
+  console.log("switchLed to: %s", status)
+  if (status == "ON")
+    $("#led").attr('src', 'led-green.png');
+  else if (status == "OFF")
+    $("#led").attr('src', 'led-red.png');
+  else if (status == "DISABLE")
+    $("#led").attr('src', 'led-grey.png');
+}
+
+function switchLocalCaldaia(status) {
+  console.log("switchLocalCaldaia to: %s", status)
+  $("#flip").val(status).flipswitch('refresh');
+  switchLed(status);
+  $("#flip").on( "change", flipChanged);
+}
+
+
+function switchRemoteCaldaia(value) {
+  cmd = (value == "ON" ? "switch_on" : "switch_off");
+  mex = '{"src_id": "' +  SMHAC_ID + '", "cmd": "' + cmd + '", "result": "--", "reply_to": "--", "_id": "123456", "dst_pin": "15"}';
+  jmex = JSON.parse(mex);
+  console.log("Sending message: %s", mex)
+  PN.publish({channel: CHANNEL, message: jmex});
+  console.log("pubnub switch command message sent!!");
+}
+
+function flipChanged(e) {
+    var value = this.value;
+    if (value == 'ON') {
+      switchLed("ON");
+      switchRemoteCaldaia(value);
+    } else {
+      switchLed("OFF");
+      switchRemoteCaldaia(value);
+    }
+  }
+
+
+// main handler
+$(document).on("pagecreate", "#main", function () {
+  // always disable flipswitch and led
+  setFlip('disable');
+  switchLed("DISABLE");
+
+  // initialize PubNub
+  console.log("initialize PubNub");
+  PN = initPubNub();
+  
+  //$("#flip").on( "change", flipChanged);
+});
+
+
+
+
+</script>
+
+
+</head>
+<body>
+
+<div data-role="page" id="main">
+  <div data-role="header">
+    <h1>Controllo Caldaia</h1>
+  </div>
+
+  <div data-role="main" class="ui-content">
+    <div class="ui-grid-a">
+      <div class="ui-block-a"><img src="caldaia.png" height="250" border="0"/></div>
+      <div class="ui-block-b led"><img id="led" src="led-grey.png" width="80" height="80" border="0"/></div>
+    </div><!-- /grid-a -->
+
+    
+    <div class="ui-field-contain interruttore">
+      
+        <select id="flip" data-role="flipswitch">
+          <option value="ON">On</option>
+          <option value="OFF">Off</option>
+        </select>
+    </div>   
+  </div>
+</div>
+
+
+
+</body>
+</html>
+
